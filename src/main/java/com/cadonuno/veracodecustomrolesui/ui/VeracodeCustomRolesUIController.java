@@ -17,6 +17,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 
 public class VeracodeCustomRolesUIController {
+  public static final String CUSTOM_ROLE_NAME_PREFIX = "custom-";
   public TextField credentialsProfile;
   public PasswordField apiIdField;
   public PasswordField apiSecretField;
@@ -270,7 +272,7 @@ public class VeracodeCustomRolesUIController {
     ObservableList<VeracodeRole> editableRoles = FXCollections.observableArrayList();
     editableRoles.addAll(
         availableRoles.stream()
-            .filter(role -> role.roleName().startsWith("custom-"))
+            .filter(role -> role.roleName().startsWith(CUSTOM_ROLE_NAME_PREFIX))
             .toList());
     return editableRoles;
   }
@@ -283,7 +285,7 @@ public class VeracodeCustomRolesUIController {
     }
     isUpdating = true;
 
-    roleNameField.setText(selectedItem.roleName());
+    roleNameField.setText(StringUtils.substringAfter(selectedItem.roleName(), CUSTOM_ROLE_NAME_PREFIX));
     roleDescriptionField.setText(selectedItem.roleDescription());
     teamAdminManageableCheckbox.setSelected(selectedItem.teamAdminManageable());
     jitAssignableCheckbox.setSelected(selectedItem.jitAssignable());
