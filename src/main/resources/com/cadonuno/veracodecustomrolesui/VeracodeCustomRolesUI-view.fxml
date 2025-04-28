@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox xmlns:fx="http://javafx.com/fxml" spacing="20.0"
+      fx:controller="com.cadonuno.veracodecustomrolesui.ui.VeracodeCustomRolesUIController">
+    <padding>
+        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
+    </padding>
+    <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0" fx:id="apiCredentialsBox">
+        <Label labelFor="$credentialsProfile">Credentials Profile:</Label>
+        <TextField fx:id="credentialsProfile">default</TextField>
+        <Button text="Fetch Credentials From Profile" onAction="#fetchCredentialsFromProfile"/>
+        <Label labelFor="$apiIdField">API ID:</Label>
+        <PasswordField fx:id="apiIdField"/>
+        <Label labelFor="$apiSecretField">API Secret Key:</Label>
+        <PasswordField fx:id="apiSecretField"/>
+        <Button fx:id="updateRolesButton" text="Update Roles and Permissions" onAction="#updateRolesAndPermissions"/>
+        <Button text="Validate Credentials" onAction="#validateApiCredentials"/>
+        <Label fx:id="credentialsStatus" textFill="red">Credentials not validated!</Label>
+    </HBox>
+    <HBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="createOrUpdateBox">
+        <Button text="Create New Custom Role" onAction="#startCreationProcess"/>
+        <Button text="Update Existing Custom Role" onAction="#startUpdateProcess"/>
+    </HBox>
+    <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="existingRoleSelectorBox">
+        <Button text="Edit API Credentials" onAction="#reset"/>
+        <ListView prefWidth="5000" fx:id="roleToEditListView"/>
+        <Button text="Select Role" onAction="#selectExistingRole"/>
+    </VBox>
+    <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="customRoleSetupBox">
+        <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
+            <Button text="Edit API Credentials" onAction="#reset"/>
+            <Button visible="false" text="Select Different Role" onAction="#backToRoleSelection"
+                    fx:id="backToRoleSelectionButton"/>
+        </HBox>
+        <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
+            <Label labelFor="$roleNameField">Role Name:</Label>
+            <TextField fx:id="roleNameField"/>
+            <Label labelFor="$roleDescriptionField">Role Description:</Label>
+            <TextField fx:id="roleDescriptionField"/>
+        </HBox>
+        <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
+            <CheckBox fx:id="teamAdminManageableCheckbox">Team Admin Manageable</CheckBox>
+            <CheckBox fx:id="jitAssignableCheckbox" selected="true">JIT Assignable</CheckBox>
+            <CheckBox fx:id="jitAssignableDefaultCheckbox">JIT Assignable Default</CheckBox>
+            <CheckBox fx:id="isApiCheckbox">Is API</CheckBox>
+            <CheckBox fx:id="ignoreTeamRestrictionsCheckbox">Ignore Team Restrictions</CheckBox>
+        </HBox>
+        <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
+            <TreeView prefWidth="5000" fx:id="childRolesTreeView"/>
+        </HBox>
+        <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
+            <TreeView prefWidth="5000" fx:id="permissionsTreeView"/>
+        </HBox>
+        <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
+            <Button text="Save" onAction="#trySave"/>
+        </HBox>
+    </VBox>
+</VBox>
