@@ -3,6 +3,7 @@ package com.cadonuno.veracodecustomrolesui.ui;
 import com.cadonuno.veracodecustomrolesui.MessageHandler;
 import com.cadonuno.veracodecustomrolesui.VeracodeCustomRolesUIApplication;
 import com.cadonuno.veracodecustomrolesui.api.ApiCredentials;
+import com.cadonuno.veracodecustomrolesui.api.ApiResults;
 import com.cadonuno.veracodecustomrolesui.api.VeracodeApi;
 import com.cadonuno.veracodecustomrolesui.models.VeracodePermission;
 import com.cadonuno.veracodecustomrolesui.models.VeracodeRole;
@@ -23,6 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 public class VeracodeCustomRolesUIController {
   public static final String CUSTOM_ROLE_NAME_PREFIX = "custom-";
@@ -54,7 +57,7 @@ public class VeracodeCustomRolesUIController {
   private boolean isUsingValidCredentials;
 
   private static boolean shouldDisablePermissionNode(VeracodePermission permission, boolean isApi) {
-    return (!isApi && permission.apiOnly()) || (isApi && permission.uiOnly());
+    return (!isApi && permission.isApiOnly()) || (isApi && permission.isUiOnly());
   }
 
   @FXML
@@ -67,6 +70,21 @@ public class VeracodeCustomRolesUIController {
         });
   }
 
+  private TextFormatter<?> getTextFormatter(int length) {
+    UnaryOperator<TextFormatter.Change> unaryOperator = (TextFormatter.Change change) -> {
+      if (change.isContentChange()) {
+        int newLength = change.getControlNewText().length();
+        if (newLength > length) {
+          String newChangeText = change.getControlNewText().substring(0, length);
+          change.setText(newChangeText);
+          change.setRange(0, length);
+        }
+      }
+      return change;
+    };
+    return new TextFormatter<>(unaryOperator);
+  }
+
   @FXML
   protected void initialize() {
     fetchCredentialsFromProfile();
@@ -77,6 +95,8 @@ public class VeracodeCustomRolesUIController {
     permissionsTreeView.setOnMouseClicked(this::handlePermissionsClick);
     apiIdField.textProperty().addListener(this::invalidateCredentials);
     apiSecretField.textProperty().addListener(this::invalidateCredentials);
+    roleNameField.setTextFormatter(getTextFormatter(256));
+    roleDescriptionField.setTextFormatter(getTextFormatter(256));
   }
 
   private void invalidateCredentials(Observable observable, String oldValue, String newValue) {
@@ -106,22 +126,22 @@ public class VeracodeCustomRolesUIController {
 
   private void recalculateAvailableRolesAndPermissionsIfNeeded(Observable observable) {
     boolean isApi = isApiCheckbox.isSelected();
-    permissionsTreeView.getRoot()
-        .getChildren()
-        .forEach(child -> {
+    Optional.ofNullable(permissionsTreeView.getRoot())
+        .map(TreeItem::getChildren)
+        .ifPresent(root -> root.forEach(child -> {
           if (child instanceof CheckBoxTreeItemExt<?> && child.getValue() instanceof VeracodePermission) {
             ((CheckBoxTreeItemExt<Object>) child).setDisabled(
                 shouldDisablePermissionNode((VeracodePermission) child.getValue(), isApi));
           }
-        });
-    childRolesTreeView.getRoot()
-        .getChildren()
-        .forEach(child -> {
+        }));
+    Optional.ofNullable(childRolesTreeView.getRoot())
+        .map(TreeItem::getChildren)
+        .ifPresent(root -> root.forEach(child -> {
           if (child instanceof CheckBoxTreeItemExt<?>) {
             ((CheckBoxTreeItemExt<VeracodeRole>) child).setDisabled(
                 shouldDisableRoleNode(child.getValue(), isApi));
           }
-        });
+        }));
   }
 
   private boolean shouldDisableRoleNode(VeracodeRole role, boolean isApi) {
@@ -130,75 +150,95 @@ public class VeracodeCustomRolesUIController {
 
   @FXML
   protected void trySave() {
-    VeracodeCustomRolesUIApplication.runWithWaitCursor(() -> {
-      VeracodeRole currentRole = isUpdating ? roleToEditListView.getSelectionModel().getSelectedItem() : null;
-      return VeracodeApi.trySaveCustomRole(previousCredentials, new VeracodeRole(
-          currentRole == null ? null : currentRole.roleId(),
-          currentRole == null ? -1 : currentRole.roleLegacyId(),
-          roleNameField.getText(),
-          roleDescriptionField.getText(),
-          false,
-          false,
-          false,
-          teamAdminManageableCheckbox.isSelected(),
-          jitAssignableCheckbox.isSelected(),
-          jitAssignableDefaultCheckbox.isSelected(),
-          isApiCheckbox.isSelected(),
-          false,
-          ignoreTeamRestrictionsCheckbox.isSelected(),
-          getAllSelectedPermissions(),
-          getAllSelectedRoles()));
-    }, (apiResults) -> {
-      String httpAction = isUpdating ? "UPDATING" : "CREATING";
-      if (apiResults.isEmpty()) {
-        MessageHandler.showError("Unknown error when " + httpAction + " Custom Role");
-      } else if (!apiResults.get().didSucceed()) {
-        MessageHandler.showError("Error when " + httpAction + " Custom Role\n"
-            + apiResults.get().getErrorMessage());
-      } else {
-        MessageHandler.showSuccess("Successfully " + (isUpdating ? "UPDATED" : "CREATED") + " role named '" + roleNameField.getText() + "'");
-        reset();
+    VeracodeRole currentRole = isUpdating ? roleToEditListView.getSelectionModel().getSelectedItem() : null;
+    VeracodeRole veracodeRoleToSave = getVeracodeRoleToSave(currentRole);
+    VeracodeCustomRolesUIApplication.runWithWaitCursor(
+        () -> VeracodeApi.trySaveCustomRole(previousCredentials, veracodeRoleToSave), (apiResults) -> {
+          String httpAction = isUpdating ? "UPDATING" : "CREATING";
+          if (!apiResults.isPresent()) {
+            MessageHandler.showError("Unknown error when " + httpAction + " Custom Role");
+          } else if (apiResults.get().didFail()) {
+            MessageHandler.showError("Error when " + httpAction + " Custom Role\n"
+                + apiResults.get().getErrorMessage());
+          } else {
+            updateRoleInAvailableRolesList(apiResults.get(), veracodeRoleToSave, currentRole);
+          }
+        });
+  }
+
+  private void updateRoleInAvailableRolesList(ApiResults apiResults, VeracodeRole veracodeRoleToSave, VeracodeRole currentRole) {
+    MessageHandler.showSuccess("Successfully " + (isUpdating ? "UPDATED" : "CREATED") + " role '" + roleNameField.getText() + "'/'" + roleDescriptionField.getText() + "'");
+
+    if (isUpdating) {
+      if (!veracodeRoleToSave.getRoleName().startsWith(CUSTOM_ROLE_NAME_PREFIX)) {
+        veracodeRoleToSave.setRoleName(CUSTOM_ROLE_NAME_PREFIX + veracodeRoleToSave.getRoleName());
       }
-    });
+      veracodeRoleToSave.setRoleName(veracodeRoleToSave.getRoleName().replace(" ", ""));
+      availableRoles.remove(currentRole);
+      availableRoles.add(veracodeRoleToSave);
+    } else {
+      availableRoles.add(VeracodeRole.fromJsonObject(apiResults.getApiResponse()));
+    }
+    loadCustomRoleList();
+    reset();
+  }
+
+  private VeracodeRole getVeracodeRoleToSave(VeracodeRole currentRole) {
+    return new VeracodeRole(
+        currentRole == null ? null : currentRole.getRoleId(),
+        currentRole == null ? -1 : currentRole.getRoleLegacyId(),
+        roleNameField.getText(),
+        roleDescriptionField.getText(),
+        false,
+        false,
+        false,
+        teamAdminManageableCheckbox.isSelected(),
+        jitAssignableCheckbox.isSelected(),
+        jitAssignableDefaultCheckbox.isSelected(),
+        isApiCheckbox.isSelected(),
+        false,
+        ignoreTeamRestrictionsCheckbox.isSelected(),
+        getAllSelectedPermissions(),
+        getAllSelectedRoles());
   }
 
   private List<VeracodeRole> getAllSelectedRoles() {
     return childRolesTreeView.getRoot().getChildren()
         .stream()
-        .filter(treeItem -> treeItem instanceof CheckBoxTreeItemExt<VeracodeRole>)
+        .filter(treeItem -> treeItem instanceof CheckBoxTreeItemExt<?>)
         .map(treeItem -> (CheckBoxTreeItemExt<VeracodeRole>) treeItem)
         .filter(CheckBoxTreeItem::isSelected)
         .map(TreeItem::getValue)
-        .toList();
+        .collect(Collectors.toList());
   }
 
   private List<VeracodePermission> getAllSelectedPermissions() {
     return permissionsTreeView.getRoot().getChildren()
         .stream()
-        .filter(treeItem -> treeItem instanceof CheckBoxTreeItemExt<Object>)
+        .filter(treeItem -> treeItem instanceof CheckBoxTreeItemExt<?>)
         .map(treeItem -> (CheckBoxTreeItemExt<Object>) treeItem)
         .filter(CheckBoxTreeItem::isSelected)
         .filter(permissionItem -> permissionItem.getValue() instanceof VeracodePermission)
         .map(this::getSelectedPermissionFromTreeItem)
-        .toList();
+        .collect(Collectors.toList());
   }
 
   private VeracodePermission getSelectedPermissionFromTreeItem(CheckBoxTreeItemExt<Object> selectedPermission) {
     VeracodePermission oldPermission = (VeracodePermission) selectedPermission.getValue();
     return new VeracodePermission(
-        oldPermission.permissionId(), oldPermission.permissionName(), oldPermission.permissionDescription(),
-        oldPermission.customRoleEnabled(), oldPermission.apiOnly(), oldPermission.uiOnly(),
+        oldPermission.getPermissionId(), oldPermission.getPermissionName(), oldPermission.getPermissionDescription(),
+        oldPermission.isCustomRoleEnabled(), oldPermission.isApiOnly(), oldPermission.isUiOnly(),
         getAllSelectedPermissionTypes(selectedPermission.getChildren()));
   }
 
   private List<String> getAllSelectedPermissionTypes(ObservableList<TreeItem<Object>> permissionTypes) {
     return permissionTypes.stream()
-        .filter(treeItem -> treeItem instanceof CheckBoxTreeItemExt<Object>)
+        .filter(treeItem -> treeItem instanceof CheckBoxTreeItemExt<?>)
         .map(treeItem -> (CheckBoxTreeItemExt<Object>) treeItem)
         .filter(CheckBoxTreeItem::isSelected)
         .filter(treeItem -> treeItem.getValue() instanceof String)
         .map(treeItem -> (String) treeItem.getValue())
-        .toList();
+        .collect(Collectors.toList());
   }
 
   protected void handleListViewClick(MouseEvent mouseClickEvent) {
@@ -217,7 +257,7 @@ public class VeracodeCustomRolesUIController {
               checkBoxTreeItem.setDisabled(shouldDisableRoleNode(role, isApi));
               return checkBoxTreeItem;
             })
-            .toList();
+            .collect(Collectors.toList());
     CheckBoxTreeItemExt<VeracodeRole> rootNode = new CheckBoxTreeItemExt<>(VeracodeRole.BASE_NODE);
     rootNode.getChildren().addAll(checkboxItems);
     rootNode.setExpanded(true);
@@ -258,13 +298,13 @@ public class VeracodeCustomRolesUIController {
 
   @FXML
   protected void backToRoleSelection() {
-    setVisibilities(false, true, false, false, false);
+    setVisibilities(true, true, false, false, true);
   }
 
   @FXML
-  protected void startUpdateProcess() {
+  protected void loadCustomRoleList() {
     roleToEditListView.setItems(getEditableRolesFromList(availableRoles));
-    setVisibilities(false, true, false, false, true);
+    setVisibilities(true, true, false, false, true);
     isUpdating = true;
   }
 
@@ -272,8 +312,8 @@ public class VeracodeCustomRolesUIController {
     ObservableList<VeracodeRole> editableRoles = FXCollections.observableArrayList();
     editableRoles.addAll(
         availableRoles.stream()
-            .filter(role -> role.roleName().startsWith(CUSTOM_ROLE_NAME_PREFIX))
-            .toList());
+            .filter(role -> role.getRoleName().startsWith(CUSTOM_ROLE_NAME_PREFIX))
+            .collect(Collectors.toList()));
     return editableRoles;
   }
 
@@ -285,39 +325,62 @@ public class VeracodeCustomRolesUIController {
     }
     isUpdating = true;
 
-    roleNameField.setText(StringUtils.substringAfter(selectedItem.roleName(), CUSTOM_ROLE_NAME_PREFIX));
-    roleDescriptionField.setText(selectedItem.roleDescription());
-    teamAdminManageableCheckbox.setSelected(selectedItem.teamAdminManageable());
-    jitAssignableCheckbox.setSelected(selectedItem.jitAssignable());
-    jitAssignableDefaultCheckbox.setSelected(selectedItem.jitAssignableDefault());
+    roleNameField.setText(StringUtils.substringAfter(selectedItem.getRoleName(), CUSTOM_ROLE_NAME_PREFIX));
+    roleDescriptionField.setText(selectedItem.getRoleDescription());
+    teamAdminManageableCheckbox.setSelected(selectedItem.isTeamAdminManageable());
+    jitAssignableCheckbox.setSelected(selectedItem.isJitAssignable());
+    jitAssignableDefaultCheckbox.setSelected(selectedItem.isJitAssignableDefault());
     isApiCheckbox.setSelected(selectedItem.isApi());
-    ignoreTeamRestrictionsCheckbox.setSelected(selectedItem.ignoreTeamRestrictions());
+    ignoreTeamRestrictionsCheckbox.setSelected(selectedItem.isIgnoreTeamRestrictions());
 
-    loadAvailableRoles(selectedItem.childRoles());
-    loadAvailablePermissions(selectedItem.permissions());
+    loadAvailableRoles(selectedItem.getChildRoles());
+    loadAvailablePermissions(selectedItem.getPermissions());
 
     setVisibilities(false, false, false, true, true);
+  }
+
+  @FXML
+  protected void tryDeleteRole() {
+    VeracodeRole selectedItem = roleToEditListView.getSelectionModel().getSelectedItem();
+    if (selectedItem == null) {
+      return;
+    }
+    if (MessageHandler.showConfirmation("Are you sure you want to delete role '" + selectedItem.getRoleDescription() + "'?")) {
+      VeracodeCustomRolesUIApplication
+          .runWithWaitCursor(() -> VeracodeApi.tryDeleteRole(previousCredentials, selectedItem.getRoleId()), (apiResults) -> {
+            if (!apiResults.isPresent()) {
+              MessageHandler.showError("Unknown error when deleting Custom Role");
+            } else if (apiResults.get().didFail()) {
+              MessageHandler.showError("Error when deleting Custom Role\n"
+                  + apiResults.get().getErrorMessage());
+            } else {
+              MessageHandler.showSuccess("Successfully deleted role named '" + selectedItem.getRoleDescription() + "'");
+              availableRoles.remove(selectedItem);
+              loadCustomRoleList();
+            }
+          });
+    }
   }
 
   private void loadAvailablePermissions(List<VeracodePermission> selectedPermissions) {
     boolean isApi = isApiCheckbox.isSelected();
     List<CheckBoxTreeItemExt<Object>> checkboxItems =
         availablePermissions.stream()
-            .filter(VeracodePermission::customRoleEnabled)
+            .filter(VeracodePermission::isCustomRoleEnabled)
             .map(permission -> {
               CheckBoxTreeItemExt<Object> checkBoxTreeItem = new CheckBoxTreeItemExt<>(permission);
               checkBoxTreeItem.setSelected(selectedPermissions.contains(permission));
-              if (permission.permissionTypes() != null && !permission.permissionTypes().isEmpty()) {
-                checkBoxTreeItem.getChildren().addAll(permission.permissionTypes().stream()
+              if (permission.getPermissionTypes() != null && !permission.getPermissionTypes().isEmpty()) {
+                checkBoxTreeItem.getChildren().addAll(permission.getPermissionTypes().stream()
                     .filter(permissionType -> !permissionType.equals("admin"))
                     .map(permissionType -> new CheckBoxTreeItemExt<Object>(permissionType))
-                    .toList());
+                    .collect(Collectors.toList()));
               }
               checkBoxTreeItem.setDisabled(shouldDisablePermissionNode(permission, isApi));
               checkBoxTreeItem.setExpanded(true);
               return checkBoxTreeItem;
             })
-            .toList();
+            .collect(Collectors.toList());
 
     CheckBoxTreeItemExt<Object> rootNode = new CheckBoxTreeItemExt<>(VeracodePermission.BASE_NODE);
     rootNode.getChildren().addAll(checkboxItems);
@@ -337,7 +400,7 @@ public class VeracodeCustomRolesUIController {
 
   @FXML
   protected void reset() {
-    setVisibilities(true, false, true, false, false);
+    setVisibilities(true, true, true, false, false);
   }
 
   @FXML
@@ -373,6 +436,7 @@ public class VeracodeCustomRolesUIController {
     VeracodeCustomRolesUIApplication.runWithWaitCursor(() -> {
       availableRoles = VeracodeApi.getAllRoles(previousCredentials);
       availablePermissions = VeracodeApi.getAllPermissions(previousCredentials);
-    });
+      return "";
+    }, (callback) -> roleToEditListView.setItems(getEditableRolesFromList(availableRoles)));
   }
 }

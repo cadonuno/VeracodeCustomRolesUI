@@ -22,9 +22,14 @@ public class VeracodeApi {
     }
   }
 
+  public static Optional<ApiResults> tryDeleteRole(ApiCredentials apiCredentials, String roleId) {
+    return ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles/" + roleId,
+        "DELETE", null);
+  }
+
   public static Optional<ApiResults> trySaveCustomRole(ApiCredentials apiCredentials, VeracodeRole veracodeRole) {
-    String fullUrl = "/api/authn/v2/roles" + (veracodeRole.roleId() != null ? "/" + veracodeRole.roleId() : "");
-    String httpMethod = veracodeRole.roleId() != null ? "PUT" : "POST";
+    String fullUrl = "/api/authn/v2/roles" + (veracodeRole.getRoleId() != null ? "/" + veracodeRole.getRoleId() : "");
+    String httpMethod = veracodeRole.getRoleId() != null ? "PUT" : "POST";
     return ApiCaller.runApi(apiCredentials, fullUrl,
         httpMethod, veracodeRole.toJsonParameter());
   }

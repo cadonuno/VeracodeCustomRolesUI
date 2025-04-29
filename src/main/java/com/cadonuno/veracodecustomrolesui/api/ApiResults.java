@@ -70,8 +70,8 @@ public class ApiResults {
     return this.apiResponse != null;
   }
 
-  public boolean didSucceed() {
-    return apiResponse != null;
+  public boolean didFail() {
+    return errorMessage != null;
   }
 
   public String getErrorMessage() {

@@ -1,6 +1,7 @@
 package com.cadonuno.veracodecustomrolesui;
 
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 public class MessageHandler {
@@ -10,20 +11,23 @@ public class MessageHandler {
   }
 
   public static void showError(Exception anException) {
-    Alert alert = new Alert(Alert.AlertType.ERROR);
-    alert.setContentText(IS_DEBUG ? anException.getMessage() + ":\n" + ExceptionUtils.getStackTrace(anException) : "Unexpected error");
-    alert.show();
+    new Alert(Alert.AlertType.ERROR,
+        IS_DEBUG ? anException.getMessage() + ":\n" + ExceptionUtils.getStackTrace(anException) : "Unexpected error")
+        .show();
   }
 
-  public static void showError(String errorMessage) {
-    Alert alert = new Alert(Alert.AlertType.ERROR);
-    alert.setContentText(errorMessage);
-    alert.show();
+  public static void showError(String message) {
+    new Alert(Alert.AlertType.ERROR, message).show();
   }
 
   public static void showSuccess(String message) {
-    Alert alert = new Alert(Alert.AlertType.INFORMATION);
-    alert.setContentText(message);
-    alert.show();
+    new Alert(Alert.AlertType.INFORMATION, message).show();
+  }
+
+  public static boolean showConfirmation(String message) {
+    return new Alert(Alert.AlertType.CONFIRMATION, message)
+        .showAndWait().map(response ->
+            response.getButtonData() == ButtonBar.ButtonData.OK_DONE
+        ).orElse(false);
   }
 }

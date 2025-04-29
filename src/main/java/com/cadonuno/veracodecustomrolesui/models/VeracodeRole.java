@@ -3,18 +3,96 @@ package com.cadonuno.veracodecustomrolesui.models;
 import com.cadonuno.veracodecustomrolesui.api.VeracodeApi;
 import org.apache.sling.commons.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 import static com.cadonuno.veracodecustomrolesui.api.VeracodeApi.*;
 
-public record VeracodeRole(String roleId, int roleLegacyId, String roleName, String roleDescription,
-                           boolean isInternal, boolean requiresToken, boolean assignedToProxyUsers,
-                           boolean teamAdminManageable, boolean jitAssignable,
-                           boolean jitAssignableDefault, boolean isApi, boolean isScanType,
-                           boolean ignoreTeamRestrictions, List<VeracodePermission> permissions,
-                           List<VeracodeRole> childRoles) implements Comparable<VeracodeRole> {
+public class VeracodeRole implements Comparable<VeracodeRole> {
+
+  private final String roleId;
+  private final int roleLegacyId;
+  private final String roleDescription;
+  private final boolean isInternal;
+  private final boolean requiresToken;
+  private final boolean assignedToProxyUsers;
+  private final boolean teamAdminManageable;
+  private final boolean jitAssignable;
+  private final boolean jitAssignableDefault;
+  private final boolean isApi;
+  private final boolean isScanType;
+  private final boolean ignoreTeamRestrictions;
+  private final List<VeracodePermission> permissions;
+  private final List<VeracodeRole> childRoles;
+  private String roleName;
+
+  public VeracodeRole(String roleId, int roleLegacyId, String roleName, String roleDescription,
+                      boolean isInternal, boolean requiresToken, boolean assignedToProxyUsers,
+                      boolean teamAdminManageable, boolean jitAssignable, boolean jitAssignableDefault,
+                      boolean isApi, boolean isScanType, boolean ignoreTeamRestrictions,
+                      List<VeracodePermission> permissions, List<VeracodeRole> childRoles) {
+    this.roleId = roleId;
+    this.roleLegacyId = roleLegacyId;
+    this.roleName = roleName;
+    this.roleDescription = roleDescription;
+    this.isInternal = isInternal;
+    this.requiresToken = requiresToken;
+    this.assignedToProxyUsers = assignedToProxyUsers;
+    this.teamAdminManageable = teamAdminManageable;
+    this.jitAssignable = jitAssignable;
+    this.jitAssignableDefault = jitAssignableDefault;
+    this.isApi = isApi;
+    this.isScanType = isScanType;
+    this.ignoreTeamRestrictions = ignoreTeamRestrictions;
+    this.permissions = permissions;
+    this.childRoles = childRoles;
+  }
+
+  public String getRoleId() {
+    return roleId;
+  }
+
+  public int getRoleLegacyId() {
+    return roleLegacyId;
+  }
+
+  public String getRoleName() {
+    return roleName;
+  }
+
+  public void setRoleName(String roleName) {
+    this.roleName = roleName;
+  }
+
+  public String getRoleDescription() {
+    return roleDescription;
+  }
+
+  public boolean isTeamAdminManageable() {
+    return teamAdminManageable;
+  }
+
+  public boolean isJitAssignable() {
+    return jitAssignable;
+  }
+
+  public boolean isJitAssignableDefault() {
+    return jitAssignableDefault;
+  }
+
+  public boolean isApi() {
+    return isApi;
+  }
+
+  public boolean isIgnoreTeamRestrictions() {
+    return ignoreTeamRestrictions;
+  }
+
+  public List<VeracodePermission> getPermissions() {
+    return new ArrayList<>(permissions);
+  }
 
   public static final VeracodeRole BASE_NODE = new VeracodeRole(null, -1, null, "[Select Child Roles]",
       false, false, false, false, false, false,
@@ -98,6 +176,10 @@ public record VeracodeRole(String roleId, int roleLegacyId, String roleName, Str
     }
   }
 
+  public List<VeracodeRole> getChildRoles() {
+    return new ArrayList<>(childRoles);
+  }
+
   private void addListToParameter(StringBuilder jsonBuilder, List<?> toAdd) {
     if (toAdd.isEmpty()) {
       jsonBuilder.append("[]");
@@ -110,9 +192,9 @@ public record VeracodeRole(String roleId, int roleLegacyId, String roleName, Str
         for (Object permissionObj : toAdd) {
           VeracodePermission permission = (VeracodePermission) permissionObj;
           jsonBuilder.append("{\n");
-          addParameter(jsonBuilder, "permission_name", permission.permissionName(), permission.permissionTypes().isEmpty());
-          if (!permission.permissionTypes().isEmpty()) {
-            addParameter(jsonBuilder, "permission_types", permission.permissionTypes(), true);
+          addParameter(jsonBuilder, "permission_name", permission.getPermissionName(), permission.getPermissionTypes().isEmpty());
+          if (!permission.getPermissionTypes().isEmpty()) {
+            addParameter(jsonBuilder, "permission_types", permission.getPermissionTypes(), true);
           }
           jsonBuilder.append("}");
           if (addedElements < totalElements) {
@@ -124,7 +206,7 @@ public record VeracodeRole(String roleId, int roleLegacyId, String roleName, Str
         for (Object roleObj : toAdd) {
           VeracodeRole role = (VeracodeRole) roleObj;
           jsonBuilder.append("{\n");
-          addParameter(jsonBuilder, "role_name", role.roleName(), true);
+          addParameter(jsonBuilder, "role_name", role.roleName, true);
           jsonBuilder.append("}");
 
           if (addedElements < totalElements) {

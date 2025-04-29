@@ -22,12 +22,13 @@
     </HBox>
     <HBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="createOrUpdateBox">
         <Button text="Create New Custom Role" onAction="#startCreationProcess"/>
-        <Button text="Update Existing Custom Role" onAction="#startUpdateProcess"/>
+        <Button text="List Existing Custom Roles" onAction="#loadCustomRoleList"/>
     </HBox>
     <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="existingRoleSelectorBox">
         <Button text="Edit API Credentials" onAction="#reset"/>
         <ListView prefWidth="5000" fx:id="roleToEditListView"/>
-        <Button text="Select Role" onAction="#selectExistingRole"/>
+        <Button text="Edit Role" onAction="#selectExistingRole"/>
+        <Button text="Delete Role" onAction="#tryDeleteRole"/>
     </VBox>
     <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="customRoleSetupBox">
         <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
@@ -36,17 +37,50 @@
                     fx:id="backToRoleSelectionButton"/>
         </HBox>
         <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
-            <Label labelFor="$roleNameField">Role Name:</Label>
-            <TextField fx:id="roleNameField"/>
-            <Label labelFor="$roleDescriptionField">Role Description:</Label>
-            <TextField fx:id="roleDescriptionField"/>
+            <Label labelFor="$roleNameField" minWidth="65">Role Name:</Label>
+            <TextField fx:id="roleNameField" minWidth="256" prefWidth="500">
+                <tooltip>
+                    <Tooltip text="The role name"/>
+                </tooltip>
+            </TextField>
+            <Label labelFor="$roleDescriptionField" minWidth="90">Role Description:</Label>
+            <TextField fx:id="roleDescriptionField" prefWidth="5000">
+                <tooltip>
+                    <Tooltip text="The short description for this role"/>
+                </tooltip>
+            </TextField>
         </HBox>
         <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
-            <CheckBox fx:id="teamAdminManageableCheckbox">Team Admin Manageable</CheckBox>
-            <CheckBox fx:id="jitAssignableCheckbox" selected="true">JIT Assignable</CheckBox>
-            <CheckBox fx:id="jitAssignableDefaultCheckbox">JIT Assignable Default</CheckBox>
-            <CheckBox fx:id="isApiCheckbox">Is API</CheckBox>
-            <CheckBox fx:id="ignoreTeamRestrictionsCheckbox">Ignore Team Restrictions</CheckBox>
+            <CheckBox fx:id="teamAdminManageableCheckbox">
+                <tooltip>
+                    <Tooltip text="Can a team admin manage this role?"/>
+                </tooltip>
+                Team Admin Manageable
+            </CheckBox>
+            <CheckBox fx:id="jitAssignableCheckbox" selected="true">
+                <tooltip>
+                    <Tooltip text="Can this role be assigned through JIT provisioning?"/>
+                </tooltip>
+                JIT Assignable
+            </CheckBox>
+            <CheckBox fx:id="jitAssignableDefaultCheckbox" selected="true">
+                <tooltip>
+                    <Tooltip text="Can this role be set as a default role for JIT provisioning?"/>
+                </tooltip>
+                JIT Assignable Default
+            </CheckBox>
+            <CheckBox fx:id="isApiCheckbox">
+                <tooltip>
+                    <Tooltip text="Is this an API role?"/>
+                </tooltip>
+                Is API
+            </CheckBox>
+            <CheckBox fx:id="ignoreTeamRestrictionsCheckbox">
+                <tooltip>
+                    <Tooltip text="Can this role operate on all teams - ignoring assigned teams?"/>
+                </tooltip>
+                Ignore Team Restrictions
+            </CheckBox>
         </HBox>
         <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
             <TreeView prefWidth="5000" fx:id="childRolesTreeView"/>
