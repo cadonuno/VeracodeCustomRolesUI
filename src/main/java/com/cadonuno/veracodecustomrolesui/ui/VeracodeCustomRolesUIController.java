@@ -298,13 +298,13 @@ public class VeracodeCustomRolesUIController {
 
   @FXML
   protected void backToRoleSelection() {
-    setVisibilities(true, true, false, false, true);
+    setVisibilities(true, true, true, false, true);
   }
 
   @FXML
   protected void loadCustomRoleList() {
     roleToEditListView.setItems(getEditableRolesFromList(availableRoles));
-    setVisibilities(true, true, false, false, true);
+    setVisibilities(true, true, true, false, true);
     isUpdating = true;
   }
 

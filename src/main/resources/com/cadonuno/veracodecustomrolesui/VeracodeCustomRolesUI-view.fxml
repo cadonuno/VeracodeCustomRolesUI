@@ -9,16 +9,35 @@
         <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
     </padding>
     <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0" fx:id="apiCredentialsBox">
-        <Label labelFor="$credentialsProfile">Credentials Profile:</Label>
-        <TextField fx:id="credentialsProfile">default</TextField>
-        <Button text="Fetch Credentials From Profile" onAction="#fetchCredentialsFromProfile"/>
-        <Label labelFor="$apiIdField">API ID:</Label>
-        <PasswordField fx:id="apiIdField"/>
-        <Label labelFor="$apiSecretField">API Secret Key:</Label>
-        <PasswordField fx:id="apiSecretField"/>
-        <Button fx:id="updateRolesButton" text="Update Roles and Permissions" onAction="#updateRolesAndPermissions"/>
-        <Button text="Validate Credentials" onAction="#validateApiCredentials"/>
-        <Label fx:id="credentialsStatus" textFill="red">Credentials not validated!</Label>
+        <VBox>
+            <Label labelFor="$credentialsProfile">Credentials Profile:</Label>
+            <TextField fx:id="credentialsProfile">default</TextField>
+        </VBox>
+        <VBox>
+            <Label/>
+            <Button text="Fetch Credentials From Profile" onAction="#fetchCredentialsFromProfile"/>
+        </VBox>
+        <VBox>
+            <Label labelFor="$apiIdField">API ID:</Label>
+            <PasswordField fx:id="apiIdField"/>
+        </VBox>
+        <VBox>
+            <Label labelFor="$apiSecretField">API Secret Key:</Label>
+            <PasswordField fx:id="apiSecretField"/>
+        </VBox>
+        <VBox>
+            <Label/>
+            <Button fx:id="updateRolesButton" text="Update Roles and Permissions"
+                    onAction="#updateRolesAndPermissions"/>
+        </VBox>
+        <VBox>
+            <Label/>
+            <Button text="Validate Credentials" onAction="#validateApiCredentials"/>
+        </VBox>
+        <VBox>
+            <Label/>
+            <Label fx:id="credentialsStatus" textFill="red">Credentials not validated!</Label>
+        </VBox>
     </HBox>
     <HBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="createOrUpdateBox">
         <Button text="Create New Custom Role" onAction="#startCreationProcess"/>
