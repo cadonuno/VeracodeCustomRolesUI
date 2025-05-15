@@ -24,7 +24,7 @@ public class CheckBoxTreeCellExt<T> extends CheckBoxTreeCell<T> implements Chang
             linkedDisabledProperty.removeListener(this);
           }
 
-          linkedDisabledProperty = checkItem.enabledProperty;
+          linkedDisabledProperty = checkItem.disabledProperty;
           linkedDisabledProperty.addListener(this);
 
           setDisable(linkedDisabledProperty.get());

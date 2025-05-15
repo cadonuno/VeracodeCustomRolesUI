@@ -5,17 +5,18 @@ import javafx.scene.control.CheckBoxTreeItem;
 
 
 public class CheckBoxTreeItemExt<T> extends CheckBoxTreeItem<T> {
-  public SimpleBooleanProperty enabledProperty = new SimpleBooleanProperty(true);
+  public SimpleBooleanProperty disabledProperty = new SimpleBooleanProperty(false);
 
   public CheckBoxTreeItemExt(T t) {
     super(t);
   }
 
+
   public boolean isEnabled() {
-    return enabledProperty.get();
+    return disabledProperty.get();
   }
 
   public void setDisabled(boolean disabled) {
-    enabledProperty.set(disabled);
+    disabledProperty.set(disabled);
   }
 }

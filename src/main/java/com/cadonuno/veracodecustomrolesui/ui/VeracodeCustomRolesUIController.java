@@ -14,6 +14,8 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -90,6 +92,7 @@ public class VeracodeCustomRolesUIController {
     fetchCredentialsFromProfile();
     validateApiCredentials();
     roleToEditListView.setOnMouseClicked(this::handleListViewClick);
+    roleToEditListView.setOnKeyReleased(this::handleRoleListPress);
     isApiCheckbox.selectedProperty().addListener(this::recalculateAvailableRolesAndPermissionsIfNeeded);
     childRolesTreeView.setOnMouseClicked(this::handleChildRolesClick);
     permissionsTreeView.setOnMouseClicked(this::handlePermissionsClick);
@@ -97,6 +100,12 @@ public class VeracodeCustomRolesUIController {
     apiSecretField.textProperty().addListener(this::invalidateCredentials);
     roleNameField.setTextFormatter(getTextFormatter(256));
     roleDescriptionField.setTextFormatter(getTextFormatter(256));
+  }
+
+  private void handleRoleListPress(KeyEvent keyEvent) {
+    if (keyEvent.getCode() == KeyCode.DELETE) {
+      tryDeleteRole();
+    }
   }
 
   private void invalidateCredentials(Observable observable, String oldValue, String newValue) {
