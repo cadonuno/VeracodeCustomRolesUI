@@ -104,11 +104,15 @@ public final class ApiCredentials {
   }
 
   public String getApiId() {
-    return apiId;
+    return "com".equals(this.instance)
+        ? apiId
+        : StringUtils.substringAfter(apiId, "-");
   }
 
   public String getApiKey() {
-    return apiKey;
+    return "com".equals(this.instance)
+        ? apiKey
+        : StringUtils.substringAfter(apiKey, "-");
   }
 
   @Override
