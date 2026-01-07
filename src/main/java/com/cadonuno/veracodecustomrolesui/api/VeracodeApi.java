@@ -16,7 +16,7 @@ public class VeracodeApi {
 
   public static boolean validateCredentials(ApiCredentials apiCredentials) {
     try {
-      return ApiCaller.runApi(apiCredentials, "/healthcheck/status", "GET", null).isPresent();
+      return ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles?size=1", "GET", null).isPresent();
     } catch (Exception ignored) {
       return false;
     }
