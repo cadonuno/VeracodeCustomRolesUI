@@ -16,7 +16,7 @@ public class MessageHandler {
   }
 
   public static void showError(Exception anException) {
-    try (BufferedWriter writer = new BufferedWriter(new FileWriter("erros.txt"))) {
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter("detailed_errors.txt"))) {
       writer.write(ExceptionUtils.getStackTrace(anException));
     } catch (IOException ex) {
       throw new RuntimeException(ex);
