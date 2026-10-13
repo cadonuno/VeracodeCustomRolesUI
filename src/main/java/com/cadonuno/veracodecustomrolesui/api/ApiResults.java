@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
 
+@SuppressWarnings("deprecation")
 public class ApiResults {
   private final String errorMessage;
   private final JSONObject apiResponse;
@@ -60,6 +61,10 @@ public class ApiResults {
 
     outputStream.flush();
     return outputStream.size() == 0 ? null : new JSONObject(outputStream.toString());
+  }
+
+  public static ApiResults makeErrorResults(String message) {
+    return new ApiResults(message);
   }
 
   public JSONObject getApiResponse() {

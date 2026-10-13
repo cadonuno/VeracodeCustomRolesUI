@@ -15,36 +15,27 @@ public class VeracodeRole implements Comparable<VeracodeRole> {
   private final String roleId;
   private final int roleLegacyId;
   private final String roleDescription;
-  private final boolean isInternal;
-  private final boolean requiresToken;
-  private final boolean assignedToProxyUsers;
   private final boolean teamAdminManageable;
   private final boolean jitAssignable;
   private final boolean jitAssignableDefault;
   private final boolean isApi;
-  private final boolean isScanType;
   private final boolean ignoreTeamRestrictions;
   private final List<VeracodePermission> permissions;
   private final List<VeracodeRole> childRoles;
   private String roleName;
 
   public VeracodeRole(String roleId, int roleLegacyId, String roleName, String roleDescription,
-                      boolean isInternal, boolean requiresToken, boolean assignedToProxyUsers,
                       boolean teamAdminManageable, boolean jitAssignable, boolean jitAssignableDefault,
-                      boolean isApi, boolean isScanType, boolean ignoreTeamRestrictions,
+                      boolean isApi, boolean ignoreTeamRestrictions,
                       List<VeracodePermission> permissions, List<VeracodeRole> childRoles) {
     this.roleId = roleId;
     this.roleLegacyId = roleLegacyId;
     this.roleName = roleName;
     this.roleDescription = roleDescription;
-    this.isInternal = isInternal;
-    this.requiresToken = requiresToken;
-    this.assignedToProxyUsers = assignedToProxyUsers;
     this.teamAdminManageable = teamAdminManageable;
     this.jitAssignable = jitAssignable;
     this.jitAssignableDefault = jitAssignableDefault;
     this.isApi = isApi;
-    this.isScanType = isScanType;
     this.ignoreTeamRestrictions = ignoreTeamRestrictions;
     this.permissions = permissions;
     this.childRoles = childRoles;
@@ -95,23 +86,20 @@ public class VeracodeRole implements Comparable<VeracodeRole> {
   }
 
   public static final VeracodeRole BASE_NODE = new VeracodeRole(null, -1, null, "[Select Child Roles]",
-      false, false, false, false, false, false,
-      false, false, false, Collections.emptyList(), Collections.emptyList());
+       false, false, false, false,
+          false, Collections.emptyList(), Collections.emptyList());
 
+  @SuppressWarnings("deprecation")
   public static VeracodeRole fromJsonObject(JSONObject roleNode) {
     return new VeracodeRole(
         tryGetElementAsString(roleNode, "role_id").orElse(""),
         tryGetElementAsInteger(roleNode, "role_legacy_id").orElse(0),
         tryGetElementAsString(roleNode, "role_name").orElse(""),
         tryGetElementAsString(roleNode, "role_description").orElse(""),
-        tryGetElementAsBoolean(roleNode, "is_internal").orElse(false),
-        tryGetElementAsBoolean(roleNode, "requires_token").orElse(false),
-        tryGetElementAsBoolean(roleNode, "assigned_to_proxy_users").orElse(false),
         tryGetElementAsBoolean(roleNode, "team_admin_manageable").orElse(false),
         tryGetElementAsBoolean(roleNode, "jit_assignable").orElse(false),
         tryGetElementAsBoolean(roleNode, "jit_assignable_default").orElse(false),
         tryGetElementAsBoolean(roleNode, "is_api").orElse(false),
-        tryGetElementAsBoolean(roleNode, "is_scan_type").orElse(false),
         tryGetElementAsBoolean(roleNode, "ignore_team_restrictions").orElse(false),
         getArrayNode(roleNode, "permissions")
             .map(VeracodeApi::getPermissionsFromNode)
@@ -141,7 +129,7 @@ public class VeracodeRole implements Comparable<VeracodeRole> {
 
   @Override
   public int compareTo(VeracodeRole other) {
-    return roleDescription.compareTo(other.roleDescription);
+    return roleDescription.toLowerCase().compareTo(other.roleDescription.toLowerCase());
   }
 
   public String toJsonParameter() {
@@ -156,6 +144,7 @@ public class VeracodeRole implements Comparable<VeracodeRole> {
     addParameter(jsonBuilder, "permissions", permissions, false);
     addParameter(jsonBuilder, "child_roles", childRoles, true);
     jsonBuilder.append("}");
+    System.out.println(jsonBuilder);
     return jsonBuilder.toString();
   }
 

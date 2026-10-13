@@ -11,7 +11,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.0</junit.version>
         <package.name>VeracodeCustomRolesUI</package.name>
-        <package.version>1.0</package.version>
+        <package.version>1.6</package.version>
     </properties>
     <name>${package.name}</name>
     <version>${package.version}</version>
@@ -20,12 +20,12 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>18.0.2</version>
+            <version>21-ea+17</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>18.0.2</version>
+            <version>21-ea+17</version>
         </dependency>
         <dependency>
             <groupId>org.kordamp.bootstrapfx</groupId>
@@ -52,7 +52,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.17.0</version>
+            <version>3.18.0</version>
         </dependency>
     </dependencies>
 
@@ -75,19 +75,21 @@
                     <execution>
                         <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
+                    </execution>
+                    <execution>
+                        <id>debug</id>
                         <configuration>
-                            <mainClass>
-                                com.cadonuno.veracodecustomrolesui/com.cadonuno.veracodecustomrolesui.VeracodeCustomRolesUIApplication
-                            </mainClass>
-                            <launcher>app</launcher>
-                            <jlinkZipName>app</jlinkZipName>
-                            <jlinkImageName>app</jlinkImageName>
-                            <noManPages>true</noManPages>
-                            <stripDebug>true</stripDebug>
-                            <noHeaderFiles>true</noHeaderFiles>
+                            <options>
+                                <option>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005</option>
+                            </options>
                         </configuration>
                     </execution>
                 </executions>
+                <configuration>
+                    <mainClass>
+                        com.cadonuno.veracodecustomrolesui.VeracodeCustomRolesUIApplication
+                    </mainClass>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

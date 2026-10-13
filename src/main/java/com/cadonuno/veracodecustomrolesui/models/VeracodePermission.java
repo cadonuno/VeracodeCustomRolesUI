@@ -5,6 +5,7 @@ import org.apache.sling.commons.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import static com.cadonuno.veracodecustomrolesui.api.VeracodeApi.*;
 
@@ -31,6 +32,21 @@ public class VeracodePermission implements Comparable<VeracodePermission> {
     this.permissionTypes = permissionTypes;
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    VeracodePermission that = (VeracodePermission) o;
+    return Objects.equals(permissionName, that.permissionName) && Objects.equals(permissionId, that.permissionId);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(permissionName, permissionId);
+  }
+
+
+  @SuppressWarnings("deprecation")
   public static VeracodePermission fromJsonObject(JSONObject permissionNode) {
     return new VeracodePermission(
         tryGetElementAsString(permissionNode, "permission_id").orElse(""),
@@ -50,7 +66,7 @@ public class VeracodePermission implements Comparable<VeracodePermission> {
 
   @Override
   public int compareTo(VeracodePermission other) {
-    return permissionDescription.compareTo(other.permissionDescription);
+    return permissionDescription.toLowerCase().compareTo(other.permissionDescription.toLowerCase());
   }
 
   public String getPermissionId() {

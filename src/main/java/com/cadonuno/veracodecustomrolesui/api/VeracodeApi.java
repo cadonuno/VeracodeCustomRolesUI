@@ -8,7 +8,9 @@ import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.JSONObject;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
+@SuppressWarnings("deprecation")
 public class VeracodeApi {
 
   public VeracodeApi() {
@@ -16,8 +18,15 @@ public class VeracodeApi {
 
   public static boolean validateCredentials(ApiCredentials apiCredentials) {
     try {
-      return ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles?size=1", "GET", null).isPresent();
-    } catch (Exception ignored) {
+      Optional<ApiResults> apiResults = ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles?size=1", "GET", null);
+      if (apiResults.map(ApiResults::didFail).orElse(false)) {
+        MessageHandler.showError(apiResults.get().getErrorMessage());
+      }
+      return apiResults
+              .map(ApiResults::hasResponse)
+              .orElse(false);
+    } catch (Exception error) {
+      MessageHandler.showError(error);
       return false;
     }
   }
@@ -34,12 +43,12 @@ public class VeracodeApi {
         httpMethod, veracodeRole.toJsonParameter());
   }
 
-  public static Set<VeracodePermission> getAllPermissions(ApiCredentials previousCredentials) {
+  public static Set<VeracodePermission> getAllPermissions(ApiCredentials apiCredentials) {
     Set<VeracodePermission> foundPermissions = new TreeSet<>();
     int currentPage = 0;
     Optional<ApiResults> apiResults;
     do {
-      apiResults = ApiCaller.runApi(previousCredentials, "/api/authn/v2/permissions?page=" + currentPage,
+      apiResults = ApiCaller.runApi(apiCredentials, "/api/authn/v2/permissions?page=" + currentPage,
               "GET", null)
           .filter(ApiResults::hasResponse);
       foundPermissions.addAll(apiResults
@@ -51,21 +60,35 @@ public class VeracodeApi {
     return foundPermissions;
   }
 
-  public static Set<VeracodeRole> getAllRoles(ApiCredentials previousCredentials) {
+  public static Set<VeracodeRole> getAllRoles(ApiCredentials apiCredentials) {
     Set<VeracodeRole> foundRoles = new TreeSet<>();
     int currentPage = 0;
     Optional<ApiResults> apiResults;
     do {
-      apiResults = ApiCaller.runApi(previousCredentials, "/api/authn/v2/roles?page=" + currentPage,
+      apiResults = ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles?page=" + currentPage,
               "GET", null)
           .filter(ApiResults::hasResponse);
       foundRoles.addAll(apiResults
-          .map((results) -> getRolesFromPayload(results.getApiResponse()))
+          .map(results -> getRolesFromPayload(results.getApiResponse()))
+          .map(roleList -> roleList.stream()
+                  .map(role -> getFullRole(role, apiCredentials))
+                  .filter(Optional::isPresent)
+                  .map(Optional::get)
+                  .collect(Collectors.toList()))
           .orElse(Collections.emptyList()));
       currentPage++;
     } while (hasMorePages(apiResults.orElse(null), currentPage));
 
     return foundRoles;
+  }
+
+  private static Optional<VeracodeRole> getFullRole(VeracodeRole role, ApiCredentials apiCredentials) {
+    return ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles/" + role.getRoleId(),
+                    "GET", null)
+            .filter(ApiResults::hasResponse)
+            .map(ApiResults::getApiResponse)
+            .map(VeracodeApi::mapToJsonObject)
+            .map(VeracodeRole::fromJsonObject);
   }
 
   private static boolean hasMorePages(ApiResults apiResults, int currentPage) {

@@ -30,6 +30,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 public class VeracodeCustomRolesUIController {
+  private static final int TEXT_FORMAT_LENGTH = 256;
   public static final String CUSTOM_ROLE_NAME_PREFIX = "custom-";
   public TextField credentialsProfile;
   public PasswordField apiIdField;
@@ -72,14 +73,14 @@ public class VeracodeCustomRolesUIController {
         });
   }
 
-  private TextFormatter<?> getTextFormatter(int length) {
+  private TextFormatter<?> getTextFormatter() {
     UnaryOperator<TextFormatter.Change> unaryOperator = (TextFormatter.Change change) -> {
       if (change.isContentChange()) {
         int newLength = change.getControlNewText().length();
-        if (newLength > length) {
-          String newChangeText = change.getControlNewText().substring(0, length);
+        if (newLength > TEXT_FORMAT_LENGTH) {
+          String newChangeText = change.getControlNewText().substring(0, TEXT_FORMAT_LENGTH);
           change.setText(newChangeText);
-          change.setRange(0, length);
+          change.setRange(0, TEXT_FORMAT_LENGTH);
         }
       }
       return change;
@@ -87,6 +88,7 @@ public class VeracodeCustomRolesUIController {
     return new TextFormatter<>(unaryOperator);
   }
 
+  @SuppressWarnings("unused")
   @FXML
   protected void initialize() {
     fetchCredentialsFromProfile();
@@ -98,8 +100,8 @@ public class VeracodeCustomRolesUIController {
     permissionsTreeView.setOnMouseClicked(this::handlePermissionsClick);
     apiIdField.textProperty().addListener(this::invalidateCredentials);
     apiSecretField.textProperty().addListener(this::invalidateCredentials);
-    roleNameField.setTextFormatter(getTextFormatter(256));
-    roleDescriptionField.setTextFormatter(getTextFormatter(256));
+    roleNameField.setTextFormatter(getTextFormatter());
+    roleDescriptionField.setTextFormatter(getTextFormatter());
   }
 
   private void handleRoleListPress(KeyEvent keyEvent) {
@@ -157,6 +159,7 @@ public class VeracodeCustomRolesUIController {
     return isApi ^ role.isApi();
   }
 
+  @SuppressWarnings("unused")
   @FXML
   protected void trySave() {
     VeracodeRole currentRole = isUpdating ? roleToEditListView.getSelectionModel().getSelectedItem() : null;
@@ -198,14 +201,10 @@ public class VeracodeCustomRolesUIController {
         currentRole == null ? -1 : currentRole.getRoleLegacyId(),
         roleNameField.getText(),
         roleDescriptionField.getText(),
-        false,
-        false,
-        false,
         teamAdminManageableCheckbox.isSelected(),
         jitAssignableCheckbox.isSelected(),
         jitAssignableDefaultCheckbox.isSelected(),
         isApiCheckbox.isSelected(),
-        false,
         ignoreTeamRestrictionsCheckbox.isSelected(),
         getAllSelectedPermissions(),
         getAllSelectedRoles());
@@ -226,7 +225,7 @@ public class VeracodeCustomRolesUIController {
         .stream()
         .filter(treeItem -> treeItem instanceof CheckBoxTreeItemExt<?>)
         .map(treeItem -> (CheckBoxTreeItemExt<Object>) treeItem)
-        .filter(CheckBoxTreeItem::isSelected)
+        .filter(treeItem -> treeItem.isSelected() || !(getAllSelectedPermissionTypes(treeItem.getChildren()).isEmpty()))
         .filter(permissionItem -> permissionItem.getValue() instanceof VeracodePermission)
         .map(this::getSelectedPermissionFromTreeItem)
         .collect(Collectors.toList());
@@ -305,6 +304,7 @@ public class VeracodeCustomRolesUIController {
     backToRoleSelectionButton.setManaged(backToSelectorButtonVisibility);
   }
 
+  @SuppressWarnings("unused")
   @FXML
   protected void backToRoleSelection() {
     setVisibilities(true, true, true, false, true);
@@ -371,19 +371,31 @@ public class VeracodeCustomRolesUIController {
     }
   }
 
+  @SuppressWarnings("SuspiciousMethodCalls")
   private void loadAvailablePermissions(List<VeracodePermission> selectedPermissions) {
     boolean isApi = isApiCheckbox.isSelected();
     List<CheckBoxTreeItemExt<Object>> checkboxItems =
         availablePermissions.stream()
-            .filter(VeracodePermission::isCustomRoleEnabled)
+            //.filter(VeracodePermission::isCustomRoleEnabled)
             .map(permission -> {
               CheckBoxTreeItemExt<Object> checkBoxTreeItem = new CheckBoxTreeItemExt<>(permission);
-              checkBoxTreeItem.setSelected(selectedPermissions.contains(permission));
+              Optional<VeracodePermission> selectedPermission = selectedPermissions
+                      .stream()
+                      .filter(p -> p.equals(permission))
+                      .findFirst();
+
+              checkBoxTreeItem.setSelected(selectedPermission.isPresent());
               if (permission.getPermissionTypes() != null && !permission.getPermissionTypes().isEmpty()) {
                 checkBoxTreeItem.getChildren().addAll(permission.getPermissionTypes().stream()
                     .filter(permissionType -> !permissionType.equals("admin"))
                     .map(permissionType -> new CheckBoxTreeItemExt<Object>(permissionType))
                     .collect(Collectors.toList()));
+                selectedPermission
+                        .ifPresent(permissionInfo -> {
+                          for (TreeItem<Object> permissionType : checkBoxTreeItem.getChildren()) {
+                            ((CheckBoxTreeItemExt<Object>)permissionType).setSelected(permissionInfo.getPermissionTypes().contains(permissionType.getValue()));
+                          }
+                        });
               }
               checkBoxTreeItem.setDisabled(shouldDisablePermissionNode(permission, isApi));
               checkBoxTreeItem.setExpanded(true);
@@ -400,6 +412,7 @@ public class VeracodeCustomRolesUIController {
     permissionsTreeView.setCellFactory(new CheckBoxTreeCellFactoryExt<>());
   }
 
+  @SuppressWarnings("unused")
   @FXML
   protected void startCreationProcess() {
     isUpdating = false;
@@ -415,14 +428,19 @@ public class VeracodeCustomRolesUIController {
   @FXML
   protected void validateApiCredentials() {
     VeracodeCustomRolesUIApplication.runWithWaitCursor(() -> {
-      Optional<ApiCredentials> newCredentials = ApiCredentials.fromIdAndKey(apiIdField.getText(), apiSecretField.getText());
-      if (newCredentials.map(credentials -> credentials.equals(previousCredentials)).orElse(false)) {
-        return isUsingValidCredentials;
-      }
-      previousCredentials = newCredentials.orElse(null);
-      return newCredentials
-          .map(VeracodeApi::validateCredentials)
-          .orElse(false);
+        try {
+            Optional<ApiCredentials> newCredentials = ApiCredentials.fromIdAndKey(apiIdField.getText(), apiSecretField.getText());
+            if (newCredentials.map(credentials -> credentials.equals(previousCredentials)).orElse(false)) {
+                return isUsingValidCredentials;
+            }
+            previousCredentials = newCredentials.orElse(null);
+            return newCredentials
+                    .map(VeracodeApi::validateCredentials)
+                    .orElse(false);
+        } catch (Exception e) {
+            MessageHandler.showError(e);
+            return false;
+        }
     }, (isValidCredentials) -> {
       isUsingValidCredentials = isValidCredentials;
       if (isValidCredentials) {
