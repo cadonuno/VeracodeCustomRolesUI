@@ -34,22 +34,57 @@ public class VeracodeCustomRolesUIApplication extends Application {
       return;
     }
 
-    Thread operationThread = new Thread(() -> {
+    Platform.runLater(() -> {
       Cursor currentCursor = scene.getCursor();
       scene.setCursor(Cursor.WAIT);
       scene.getRoot().setDisable(true);
-      try {
-        T value = toRun.get();
-        if (uiCallback != null) {
-          Platform.runLater(() -> uiCallback.accept(value));
+
+      Thread operationThread = new Thread(() -> {
+        T value = null;
+        Throwable error = null;
+        try {
+          value = toRun.get();
+        } catch (Throwable e) {
+          error = e;
+        } finally {
+          final T finalValue = value;
+          final Throwable finalError = error;
+          try {
+            Platform.runLater(() -> {
+              try {
+                restoreUIState(currentCursor);
+                if (finalError != null) {
+                  MessageHandler.showError("Error: " + getErrorMessage(finalError));
+                } else if (uiCallback != null) {
+                  try {
+                    uiCallback.accept(finalValue);
+                  } catch (Exception callbackError) {
+                    MessageHandler.showError("Error: " + getErrorMessage(callbackError));
+                  }
+                }
+              } catch (Exception restoreError) {
+                restoreUIState(currentCursor);
+              }
+            });
+          } catch (Exception platformError) {
+            restoreUIState(currentCursor);
+          }
         }
-      } finally {
-        scene.setCursor(currentCursor);
-        scene.getRoot().setDisable(false);
-      }
+      });
+      operationThread.setDaemon(true);
+      operationThread.start();
     });
-    operationThread.setDaemon(true);
-    operationThread.start();
+  }
+
+  private static void restoreUIState(Cursor cursor) {
+    if (scene != null) {
+      scene.setCursor(cursor);
+      scene.getRoot().setDisable(false);
+    }
+  }
+
+  private static String getErrorMessage(Throwable throwable) {
+    return throwable.getMessage() != null ? throwable.getMessage() : throwable.getClass().getSimpleName();
   }
 
   @Override
