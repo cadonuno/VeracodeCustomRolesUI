@@ -7,12 +7,15 @@ import com.cadonuno.veracodecustomrolesui.api.ApiResults;
 import com.cadonuno.veracodecustomrolesui.api.VeracodeApi;
 import com.cadonuno.veracodecustomrolesui.models.VeracodePermission;
 import com.cadonuno.veracodecustomrolesui.models.VeracodeRole;
+import com.cadonuno.veracodecustomrolesui.services.RoleExportImportService;
 import com.cadonuno.veracodecustomrolesui.ui.components.CheckBoxTreeCellFactoryExt;
 import com.cadonuno.veracodecustomrolesui.ui.components.CheckBoxTreeItemExt;
+import javafx.application.Platform;
 import javafx.beans.Observable;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -20,10 +23,20 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.sling.commons.json.JSONException;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
@@ -460,10 +473,355 @@ public class VeracodeCustomRolesUIController {
 
   @FXML
   protected void updateRolesAndPermissions() {
+    updateRoles(true);
+  }
+
+  private void updateRoles(boolean includePermissions) {
     VeracodeCustomRolesUIApplication.runWithWaitCursor(() -> {
       availableRoles = VeracodeApi.getAllRoles(previousCredentials);
-      availablePermissions = VeracodeApi.getAllPermissions(previousCredentials);
+      if (includePermissions) {
+        availablePermissions = VeracodeApi.getAllPermissions(previousCredentials);
+      }
       return "";
     }, (callback) -> roleToEditListView.setItems(getEditableRolesFromList(availableRoles)));
+  }
+
+  @SuppressWarnings("unused")
+  @FXML
+  protected void exportSelectedRoles() {
+    ObservableList<VeracodeRole> editableRoles = getEditableRolesFromList(availableRoles);
+    if (editableRoles.isEmpty()) {
+      MessageHandler.showError("No roles available to export");
+      return;
+    }
+
+    Dialog<ButtonType> dialog = new Dialog<>();
+    dialog.setTitle("Export Roles");
+    dialog.setHeaderText("Select roles to export (Ctrl+Click or Shift+Click for multiple)");
+
+    ListView<VeracodeRole> listView = new ListView<>(editableRoles);
+    listView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+    listView.setPrefHeight(300);
+
+    dialog.getDialogPane().setContent(listView);
+    ButtonType exportButtonType = new ButtonType("Export", ButtonBar.ButtonData.OK_DONE);
+    ButtonType cancelButtonType = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+    dialog.getDialogPane().getButtonTypes().addAll(exportButtonType, cancelButtonType);
+
+    Optional<ButtonType> result = dialog.showAndWait();
+    if (result.isPresent() && result.get() == exportButtonType) {
+      List<VeracodeRole> selectedRoles = new ArrayList<>(listView.getSelectionModel().getSelectedItems());
+
+      if (selectedRoles.isEmpty()) {
+        MessageHandler.showError("Please select at least one role to export");
+        return;
+      }
+
+      FileChooser fileChooser = new FileChooser();
+      fileChooser.setTitle("Save Exported Roles");
+      fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
+      fileChooser.setInitialFileName("exported_roles.json");
+
+      Stage stage = (Stage) roleToEditListView.getScene().getWindow();
+      File selectedFile = fileChooser.showSaveDialog(stage);
+
+      if (selectedFile != null) {
+        VeracodeCustomRolesUIApplication.runWithWaitCursor(
+            () -> {
+              try {
+                RoleExportImportService.exportRolesToJson(selectedRoles, selectedFile.toPath());
+                return true;
+              } catch (Exception e) {
+                MessageHandler.showError("Error exporting roles: " + e.getMessage());
+                return false;
+              }
+            },
+            (success) -> {
+              if (success) {
+                MessageHandler.showSuccess("Successfully exported " + selectedRoles.size() + " role(s) to " + selectedFile.getName());
+              }
+            }
+        );
+      }
+    }
+  }
+
+  @SuppressWarnings("unused")
+  @FXML
+  protected void importRoles() {
+    FileChooser fileChooser = new FileChooser();
+    fileChooser.setTitle("Select Roles File to Import");
+    fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON Files", "*.json"));
+
+    Stage stage = (Stage) roleToEditListView.getScene().getWindow();
+    File selectedFile = fileChooser.showOpenDialog(stage);
+
+    if (selectedFile != null) {
+      VeracodeCustomRolesUIApplication.runWithWaitCursor(
+          () -> {
+            try {
+              List<RoleExportImportService.RoleImportData> importedRoles =
+                  RoleExportImportService.importRolesFromJson(selectedFile.toPath());
+
+              // Validate child_roles references
+              List<String> missingChildRoles =
+                  RoleExportImportService.validateChildRoles(importedRoles, availableRoles);
+              if (!missingChildRoles.isEmpty()) {
+                String errorMessage = "Invalid Child Roles\n\nThe following child roles referenced in the import file do not exist:\n\n" +
+                    String.join("\n", missingChildRoles) +
+                    "\n\nPlease ensure all referenced roles exist on the platform before importing.";
+                MessageHandler.showError(errorMessage);
+                return null;
+              }
+
+              return importedRoles;
+            } catch (JSONException | IOException e) {
+              MessageHandler.showError("Error importing roles: " + e.getMessage());
+              return null;
+            }
+          },
+          (importedRoles) -> {
+            if (importedRoles != null) {
+              handleImportConflicts(importedRoles);
+            }
+          }
+      );
+    }
+  }
+
+  private void handleImportConflicts(List<RoleExportImportService.RoleImportData> importedRoles) {
+    List<RoleExportImportService.RoleImportData> sortedRoles = topologicalSort(importedRoles);
+    List<RoleExportImportService.RoleImportData> conflicts = new ArrayList<>();
+    List<RoleExportImportService.RoleImportData> noConflicts = new ArrayList<>();
+
+    for (RoleExportImportService.RoleImportData roleData : sortedRoles) {
+      if (findRoleByName(roleData.roleName).isPresent()) {
+        conflicts.add(roleData);
+      } else {
+        noConflicts.add(roleData);
+      }
+    }
+
+    if (!conflicts.isEmpty()) {
+      Platform.runLater(() -> showConflictDialog(conflicts, noConflicts));
+    } else {
+      VeracodeCustomRolesUIApplication.runWithWaitCursor(
+          () -> {
+            noConflicts.forEach(roleData -> createImportedRole(roleData, roleData.roleName, roleData.roleDescription));
+            availableRoles = VeracodeApi.getAllRoles(previousCredentials);
+            return true;
+          },
+          (success) -> roleToEditListView.setItems(getEditableRolesFromList(availableRoles))
+      );
+    }
+  }
+
+  private List<RoleExportImportService.RoleImportData> topologicalSort(List<RoleExportImportService.RoleImportData> roles) {
+    Map<String, RoleExportImportService.RoleImportData> rolesByName = new HashMap<>();
+    List<RoleExportImportService.RoleImportData> sorted = new ArrayList<>();
+    Set<String> visited = new HashSet<>();
+    Set<String> visiting = new HashSet<>();
+
+    for (RoleExportImportService.RoleImportData role : roles) {
+      rolesByName.putIfAbsent(RoleExportImportService.toLookupKey(role.roleName), role);
+    }
+
+    for (RoleExportImportService.RoleImportData role : roles) {
+      visit(role, rolesByName, sorted, visited, visiting);
+    }
+
+    return sorted;
+  }
+
+  private Optional<VeracodeRole> findRoleByName(String name) {
+    return availableRoles.stream()
+        .filter(r -> r.getRoleName() != null && r.getRoleName().equalsIgnoreCase(name))
+        .findFirst();
+  }
+
+  private void visit(RoleExportImportService.RoleImportData role,
+                     Map<String, RoleExportImportService.RoleImportData> rolesByName,
+                     List<RoleExportImportService.RoleImportData> sorted,
+                     Set<String> visited, Set<String> visiting) {
+    if (role == null || role.roleName == null || role.roleName.isEmpty()) {
+      return;
+    }
+    if (visited.contains(role.roleName)) {
+      return;
+    }
+    if (visiting.contains(role.roleName)) {
+      throw new IllegalArgumentException("Circular dependency detected: role '" + role.roleName + "' references itself");
+    }
+
+    visiting.add(role.roleName);
+
+    for (VeracodeRole childRole : role.getChildRoles()) {
+      RoleExportImportService.RoleImportData dependency = rolesByName.get(RoleExportImportService.toLookupKey(childRole.getRoleName()));
+      if (dependency != null) {
+        visit(dependency, rolesByName, sorted, visited, visiting);
+      }
+    }
+
+    visiting.remove(role.roleName);
+    visited.add(role.roleName);
+    sorted.add(role);
+  }
+
+  private void showConflictDialog(List<RoleExportImportService.RoleImportData> conflicts,
+                                   List<RoleExportImportService.RoleImportData> noConflicts) {
+    Dialog<List<ConflictResolution>> dialog = new Dialog<>();
+    dialog.setTitle("Import Conflicts");
+    dialog.setHeaderText("The following roles already exist. Choose an action for each:");
+
+    VBox content = new VBox(10);
+    content.setPadding(new Insets(15));
+    List<ConflictRow> rows = new ArrayList<>();
+
+    for (RoleExportImportService.RoleImportData roleData : conflicts) {
+      HBox row = new HBox(10);
+      row.setStyle("-fx-border-color: #e0e0e0; -fx-border-width: 0 0 1 0; -fx-padding: 10;");
+
+      Label roleLabel = new Label(roleData.roleName);
+      roleLabel.setMinWidth(150);
+
+      ComboBox<String> actionBox = new ComboBox<>();
+      actionBox.getItems().addAll("Overwrite", "Skip", "Rename");
+      actionBox.setValue("Skip");
+
+      TextField renameField = new TextField();
+      renameField.setPromptText("New name");
+      renameField.setMinWidth(150);
+      renameField.setVisible(false);
+      renameField.setManaged(false);
+      renameField.setTextFormatter(getTextFormatter());
+
+      actionBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+        boolean isRename = "Rename".equals(newVal);
+        renameField.setVisible(isRename);
+        renameField.setManaged(isRename);
+      });
+
+      row.getChildren().addAll(roleLabel, actionBox, renameField);
+      content.getChildren().add(row);
+
+      rows.add(new ConflictRow(roleData, actionBox, renameField));
+    }
+
+    ScrollPane scrollPane = new ScrollPane(content);
+    scrollPane.setFitToWidth(true);
+    scrollPane.setPrefHeight(300);
+
+    dialog.getDialogPane().setContent(scrollPane);
+    ButtonType applyButton = new ButtonType("Apply", ButtonBar.ButtonData.OK_DONE);
+    ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+    dialog.getDialogPane().getButtonTypes().addAll(applyButton, cancelButton);
+
+    dialog.setResultConverter(buttonType -> buttonType == applyButton ? snapshotResolutions(rows) : null);
+
+    Optional<List<ConflictResolution>> result = dialog.showAndWait();
+    if (!result.isPresent()) {
+      return;
+    }
+    List<ConflictResolution> resolutions = result.get();
+
+    VeracodeCustomRolesUIApplication.runWithWaitCursor(
+        () -> {
+          for (ConflictResolution resolution : resolutions) {
+            if ("Overwrite".equals(resolution.action)) {
+              deleteExistingRoleAndCreate(resolution.roleData);
+            } else if ("Rename".equals(resolution.action) && !resolution.newName.isEmpty()) {
+              String descWithoutPrefix = resolution.newName.startsWith(CUSTOM_ROLE_NAME_PREFIX) ?
+                  resolution.newName.substring(CUSTOM_ROLE_NAME_PREFIX.length()) : resolution.newName;
+              String nameWithPrefix = RoleExportImportService.ensureCustomPrefix(resolution.newName, CUSTOM_ROLE_NAME_PREFIX);
+              createImportedRole(resolution.roleData, nameWithPrefix, descWithoutPrefix);
+            }
+          }
+
+          for (RoleExportImportService.RoleImportData roleData : noConflicts) {
+            createImportedRole(roleData, roleData.roleName, roleData.roleDescription);
+          }
+
+          availableRoles = VeracodeApi.getAllRoles(previousCredentials);
+          return true;
+        },
+        (success) -> roleToEditListView.setItems(getEditableRolesFromList(availableRoles))
+    );
+  }
+
+  /**
+   * Reads the conflict dialog's controls on the JavaFX thread so the background import task only
+   * sees plain data and does not keep the closed dialog's scene graph alive.
+   */
+  private static List<ConflictResolution> snapshotResolutions(List<ConflictRow> rows) {
+    List<ConflictResolution> resolutions = new ArrayList<>(rows.size());
+    for (ConflictRow row : rows) {
+      resolutions.add(new ConflictResolution(row.roleData, row.actionBox.getValue(),
+          row.renameField.getText().trim()));
+    }
+    return resolutions;
+  }
+
+  private static class ConflictRow {
+    final RoleExportImportService.RoleImportData roleData;
+    final ComboBox<String> actionBox;
+    final TextField renameField;
+
+    ConflictRow(RoleExportImportService.RoleImportData roleData, ComboBox<String> actionBox, TextField renameField) {
+      this.roleData = roleData;
+      this.actionBox = actionBox;
+      this.renameField = renameField;
+    }
+  }
+
+  private static class ConflictResolution {
+    final RoleExportImportService.RoleImportData roleData;
+    final String action;
+    final String newName;
+
+    ConflictResolution(RoleExportImportService.RoleImportData roleData, String action, String newName) {
+      this.roleData = roleData;
+      this.action = action;
+      this.newName = newName;
+    }
+  }
+
+  private void deleteExistingRoleAndCreate(RoleExportImportService.RoleImportData roleData) {
+    Optional<VeracodeRole> existingRole = findRoleByName(roleData.roleName);
+
+    if (existingRole.isPresent()) {
+      try {
+        Optional<ApiResults> deleteResult = VeracodeApi.tryDeleteRole(previousCredentials, existingRole.get().getRoleId());
+        if (deleteResult.isPresent() && deleteResult.get().didFail()) {
+          MessageHandler.showError("Error deleting existing role: " + deleteResult.get().getErrorMessage());
+          return;
+        }
+        availableRoles.remove(existingRole.get());
+        createImportedRole(roleData, roleData.roleName, roleData.roleDescription);
+      } catch (Exception e) {
+        MessageHandler.showError("Error deleting existing role: " + e.getMessage());
+      }
+    }
+  }
+
+  private void createImportedRole(RoleExportImportService.RoleImportData roleData, String roleName, String roleDescription) {
+    try {
+      if (roleName == null || roleName.trim().isEmpty()) {
+        MessageHandler.showError("Cannot import role: name is empty");
+        return;
+      }
+      String roleNameWithPrefix = RoleExportImportService.ensureCustomPrefix(roleName, CUSTOM_ROLE_NAME_PREFIX);
+      List<VeracodePermission> permissions = roleData.getPermissions();
+      List<VeracodeRole> childRoles = roleData.getChildRoles();
+      Optional<ApiResults> result = VeracodeApi.trySaveCustomRole(previousCredentials,
+          new VeracodeRole(null, -1, roleNameWithPrefix, roleDescription,
+              roleData.teamAdminManageable, roleData.jitAssignable, roleData.jitAssignableDefault,
+              roleData.isApi, roleData.ignoreTeamRestrictions,
+              permissions, childRoles));
+      if (result.isPresent() && result.get().didFail()) {
+        MessageHandler.showError("Error creating role '" + roleName + "': " + result.get().getErrorMessage());
+      }
+    } catch (Exception e) {
+      MessageHandler.showError("Error creating role '" + roleName + "': " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+    }
   }
 }
