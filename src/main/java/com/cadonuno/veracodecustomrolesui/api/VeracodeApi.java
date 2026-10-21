@@ -70,25 +70,11 @@ public class VeracodeApi {
           .filter(ApiResults::hasResponse);
       foundRoles.addAll(apiResults
           .map(results -> getRolesFromPayload(results.getApiResponse()))
-          .map(roleList -> roleList.stream()
-                  .map(role -> getFullRole(role, apiCredentials))
-                  .filter(Optional::isPresent)
-                  .map(Optional::get)
-                  .collect(Collectors.toList()))
           .orElse(Collections.emptyList()));
       currentPage++;
     } while (hasMorePages(apiResults.orElse(null), currentPage));
 
     return foundRoles;
-  }
-
-  private static Optional<VeracodeRole> getFullRole(VeracodeRole role, ApiCredentials apiCredentials) {
-    return ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles/" + role.getRoleId(),
-                    "GET", null)
-            .filter(ApiResults::hasResponse)
-            .map(ApiResults::getApiResponse)
-            .map(VeracodeApi::mapToJsonObject)
-            .map(VeracodeRole::fromJsonObject);
   }
 
   private static boolean hasMorePages(ApiResults apiResults, int currentPage) {

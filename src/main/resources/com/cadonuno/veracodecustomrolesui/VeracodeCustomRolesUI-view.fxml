@@ -46,8 +46,12 @@
     <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="existingRoleSelectorBox">
         <Button text="Edit API Credentials" onAction="#reset"/>
         <ListView prefWidth="5000" fx:id="roleToEditListView"/>
-        <Button text="Edit Role" onAction="#selectExistingRole"/>
-        <Button text="Delete Role" onAction="#tryDeleteRole"/>
+        <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
+            <Button text="Edit Role" onAction="#selectExistingRole"/>
+            <Button text="Delete Role" onAction="#tryDeleteRole"/>
+            <Button text="Export Roles" onAction="#exportSelectedRoles"/>
+            <Button text="Import Roles" onAction="#importRoles"/>
+        </HBox>
     </VBox>
     <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="customRoleSetupBox">
         <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
