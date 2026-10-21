@@ -144,7 +144,6 @@ public class VeracodeRole implements Comparable<VeracodeRole> {
     addParameter(jsonBuilder, "permissions", permissions, false);
     addParameter(jsonBuilder, "child_roles", childRoles, true);
     jsonBuilder.append("}");
-    System.out.println(jsonBuilder);
     return jsonBuilder.toString();
   }
 

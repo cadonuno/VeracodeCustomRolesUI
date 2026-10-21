@@ -14,14 +14,23 @@ public class ApiResults {
   private final String errorMessage;
   private final JSONObject apiResponse;
 
+  @SuppressWarnings("unused")
+  public String getRawJson() {
+    return rawJson;
+  }
+
+  private final String rawJson;
+
   private ApiResults(JSONObject apiResponse) {
     this.apiResponse = apiResponse;
     this.errorMessage = null;
+    this.rawJson = apiResponse.toString();
   }
 
-  private ApiResults(String errorMessage) {
+  private ApiResults(String errorMessage, String rawJson) {
     this.apiResponse = null;
     this.errorMessage = errorMessage;
+    this.rawJson = rawJson;
   }
 
   public static Optional<ApiResults> tryGetResults(HttpsURLConnection connection) {
@@ -29,19 +38,19 @@ public class ApiResults {
       if (connection != null) {
         int responseCode = connection.getResponseCode();
         String errorMessage;
-        JSONObject response;
         if (responseCode < 200 || responseCode > 299) {
           errorMessage = "Error Code: " + responseCode;
           try (InputStream responseInputStream = connection.getErrorStream()) {
+            Optional<JSONObject> response;
             response = readResponse(responseInputStream);
-            if (response != null) {
-              errorMessage += "\nResponse Body: \n" + VeracodeApi.tryGetElementAsString(response, "message").orElse("EMPTY");
+            if (response.isPresent()) {
+              errorMessage += "\nResponse Body: \n" + VeracodeApi.tryGetElementAsString(response.get(), "message").orElse("EMPTY");
             }
-            return Optional.of(new ApiResults(errorMessage));
+            return Optional.of(new ApiResults(errorMessage, response.map(JSONObject::toString).orElse("")));
           }
         }
         try (InputStream responseInputStream = connection.getInputStream()) {
-          return Optional.of(new ApiResults(readResponse(responseInputStream)));
+          return readResponse(responseInputStream).map(ApiResults::new);
         }
       }
     } catch (IOException ignored) {
@@ -50,7 +59,7 @@ public class ApiResults {
     return Optional.empty();
   }
 
-  private static JSONObject readResponse(InputStream responseInputStream) throws IOException, JSONException {
+  private static Optional<JSONObject> readResponse(InputStream responseInputStream) throws IOException, JSONException {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     byte[] responseBytes = new byte[16384];
 
@@ -60,11 +69,11 @@ public class ApiResults {
     }
 
     outputStream.flush();
-    return outputStream.size() == 0 ? null : new JSONObject(outputStream.toString());
+    return outputStream.size() == 0 ? Optional.empty() : Optional.of(new JSONObject(outputStream.toString()));
   }
 
   public static ApiResults makeErrorResults(String message) {
-    return new ApiResults(message);
+    return new ApiResults(message, "");
   }
 
   public JSONObject getApiResponse() {
