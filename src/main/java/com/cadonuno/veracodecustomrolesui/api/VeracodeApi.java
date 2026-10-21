@@ -1,14 +1,19 @@
 package com.cadonuno.veracodecustomrolesui.api;
 
 import com.cadonuno.veracodecustomrolesui.MessageHandler;
+import com.cadonuno.veracodecustomrolesui.models.RoleToDisable;
 import com.cadonuno.veracodecustomrolesui.models.VeracodePermission;
 import com.cadonuno.veracodecustomrolesui.models.VeracodeRole;
 import org.apache.sling.commons.json.JSONArray;
 import org.apache.sling.commons.json.JSONException;
 import org.apache.sling.commons.json.JSONObject;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 @SuppressWarnings("deprecation")
 public class VeracodeApi {
@@ -60,6 +65,23 @@ public class VeracodeApi {
     return foundPermissions;
   }
 
+  public static Set<RoleToDisable> getDisabledRoles(ApiCredentials apiCredentials) {
+    Set<RoleToDisable> foundRoles = new TreeSet<>();
+    int currentPage = 0;
+    Optional<ApiResults> apiResults;
+    do {
+      apiResults = ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles_disabled?page=" + currentPage,
+                      "GET", null)
+              .filter(ApiResults::hasResponse);
+      foundRoles.addAll(apiResults
+              .map(results -> getRolesToDisableFromPayload(results.getApiResponse()))
+              .orElse(Collections.emptyList()));
+      currentPage++;
+    } while (hasMorePages(apiResults.orElse(null), currentPage));
+
+    return foundRoles;
+  }
+
   public static Set<VeracodeRole> getAllRoles(ApiCredentials apiCredentials) {
     Set<VeracodeRole> foundRoles = new TreeSet<>();
     int currentPage = 0;
@@ -104,10 +126,18 @@ public class VeracodeApi {
 
   private static List<VeracodeRole> getRolesFromPayload(JSONObject apiResponse) {
     return Optional.of(apiResponse)
-        .flatMap(VeracodeApi::getEmbeddedNode)
-        .flatMap(embeddedNode -> getArrayNode(embeddedNode, "roles"))
-        .map(VeracodeApi::getRolesFromNode)
-        .orElse(Collections.emptyList());
+            .flatMap(VeracodeApi::getEmbeddedNode)
+            .flatMap(embeddedNode -> getArrayNode(embeddedNode, "roles"))
+            .map(VeracodeApi::getRolesFromNode)
+            .orElse(Collections.emptyList());
+  }
+
+  private static List<RoleToDisable> getRolesToDisableFromPayload(JSONObject apiResponse) {
+    return Optional.of(apiResponse)
+            .flatMap(VeracodeApi::getEmbeddedNode)
+            .flatMap(embeddedNode -> getArrayNode(embeddedNode, "disabled_role_records"))
+            .map(VeracodeApi::getRolesToDisableFromNode)
+            .orElse(Collections.emptyList());
   }
 
   public static List<VeracodeRole> getRolesFromNode(JSONArray allRoles) {
@@ -115,8 +145,20 @@ public class VeracodeApi {
 
     for (int currentIndex = 0; currentIndex < allRoles.length(); ++currentIndex) {
       tryGetJsonObjectAtJsonArrayIndex(allRoles, currentIndex)
-          .map(VeracodeRole::fromJsonObject)
-          .ifPresent(foundRoles::add);
+              .map(VeracodeRole::fromJsonObject)
+              .ifPresent(foundRoles::add);
+    }
+
+    return foundRoles;
+  }
+
+  public static List<RoleToDisable> getRolesToDisableFromNode(JSONArray allRoles) {
+    List<RoleToDisable> foundRoles = new ArrayList<>();
+
+    for (int currentIndex = 0; currentIndex < allRoles.length(); ++currentIndex) {
+      tryGetJsonObjectAtJsonArrayIndex(allRoles, currentIndex)
+              .map(RoleToDisable::build)
+              .ifPresent(foundRoles::add);
     }
 
     return foundRoles;
@@ -212,5 +254,16 @@ public class VeracodeApi {
     return tryGetElementFromJsonObject(embeddedNode, nodeToGet)
         .filter(result -> result instanceof JSONArray)
         .map(VeracodeApi::mapToJsonArray);
+  }
+
+
+  public static Optional<ApiResults> tryEnableDisableRole(ApiCredentials apiCredentials, String roleId, Boolean isEnable) {
+    if (isEnable) {
+      return ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles_disabled/" + roleId,
+              "DELETE", null);
+    } else {
+      return ApiCaller.runApi(apiCredentials, "/api/authn/v2/roles_disabled",
+              "POST", "{ \"role_id\": \"" + roleId + "\" }");
+    }
   }
 }

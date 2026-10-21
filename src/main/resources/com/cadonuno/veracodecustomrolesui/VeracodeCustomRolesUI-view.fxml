@@ -42,7 +42,14 @@
     <HBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="createOrUpdateBox">
         <Button text="Create New Custom Role" onAction="#startCreationProcess"/>
         <Button text="List Existing Custom Roles" onAction="#loadCustomRoleList"/>
+        <Button text="View enabled and disabled Veracode roles" onAction="#loadRolesToEnableDisable"/>
     </HBox>
+    <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="enableDisableRolesSetupBox">
+        <Button visible="false" text="Back to Role Selection" onAction="#backToRoleSelection"
+                fx:id="backToRoleSelectionFromRoleDisableButton"/>
+        <ListView prefWidth="5000" fx:id="rolesToEnableDisableListView"/>
+        <Button fx:id="enableDisableButton" text="Enable/Disable role" onAction="#enableDisableSelectedRole"/>
+    </VBox>
     <VBox xmlns:fx="http://javafx.com/fxml" visible="false" spacing="20.0" fx:id="existingRoleSelectorBox">
         <Button text="Edit API Credentials" onAction="#reset"/>
         <ListView prefWidth="5000" fx:id="roleToEditListView"/>
@@ -57,7 +64,7 @@
         <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
             <Button text="Edit API Credentials" onAction="#reset"/>
             <Button visible="false" text="Select Different Role" onAction="#backToRoleSelection"
-                    fx:id="backToRoleSelectionButton"/>
+                    fx:id="backToRoleSelectionFromRoleEditButton"/>
         </HBox>
         <HBox xmlns:fx="http://javafx.com/fxml" spacing="20.0">
             <Label labelFor="$roleNameField" minWidth="65">Role Name:</Label>

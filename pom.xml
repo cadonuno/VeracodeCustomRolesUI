@@ -11,7 +11,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.0</junit.version>
         <package.name>VeracodeCustomRolesUI</package.name>
-        <package.version>1.6</package.version>
+        <package.version>1.7</package.version>
     </properties>
     <name>${package.name}</name>
     <version>${package.version}</version>

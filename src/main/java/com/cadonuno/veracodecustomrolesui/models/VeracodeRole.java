@@ -41,6 +41,11 @@ public class VeracodeRole implements Comparable<VeracodeRole> {
     this.childRoles = childRoles;
   }
 
+  public static VeracodeRole fromRoleToDisable(RoleToDisable enabledRole) {
+    return new VeracodeRole(enabledRole.getRoleId(), -1, enabledRole.getRoleName(), enabledRole.getRoleDescription(),
+            false, false, false, false, false, Collections.emptyList(), Collections.emptyList());
+  }
+
   public String getRoleId() {
     return roleId;
   }
